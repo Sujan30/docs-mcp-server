@@ -3,6 +3,10 @@
 Welcome to the **Docs MCP Server**!  
 This tool gives your AI the ability to create and edit Google Docs via MCP, turning natural language into powerful document workflows.
 
+So you can do things like this:
+
+<img width="1239" alt="Screenshot 2025-06-07 at 4 20 06 PM" src="https://github.com/user-attachments/assets/ce7b0c75-4864-4401-86ce-c0c09bc60a2c" />
+
 ---
 
 ## ⚙️ Core Functionalities
