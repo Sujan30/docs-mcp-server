@@ -12,11 +12,11 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 #change this to your actual Credentials path & token path from authentication.py
 
-CREDENTIALS_PATH = TOKEN_FILE
+CREDENTIALS_PATH = CREDENTIALS_FILE
 
 #your token.pickle file will be generated after the first run, so run your code & copy the path
 
-TOKEN_PATH = CREDENTIALS_FILE
+TOKEN_PATH = TOKEN_FILE
 
 # Now import your custom modules
 try:
