@@ -16,8 +16,8 @@ With this server, your AI (like Claude or GPT) can:
 ✅ Create a new Google Doc with just a title  
 ✅ Create a new Google Doc with both title and content  
 ✅ Add more content to an existing document  
-✅ Create google calendar events with just plain text
-✅ Find the next number of events with just plain text
+✅ Create google calendar events & list out the next x events with just plain text
+
 
 ---
 
