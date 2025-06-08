@@ -26,6 +26,13 @@ except ImportError as e:
     print(f"Failed to import GoogleDocsClient: {e}")
     GoogleDocsClient = None
 
+try:
+    from cal import CalendarClient
+    print('success importing calendarclient')
+except ImportError as e:
+    print(f'failed to import calendar client {e}')
+    CalendarClient = None
+
 # Initialize FastMCP Server
 mcp = FastMCP("google-docs-mcp")
 
@@ -33,6 +40,8 @@ mcp = FastMCP("google-docs-mcp")
 docs_client = None
 last_auth_check = 0
 
+
+calendar_client = None
 
 
 
@@ -318,8 +327,129 @@ def main():
     print("💡 Example: 'Create a new Google doc called Meeting Notes'")
     print("🔧 If you have auth issues, restart the server, or check credentials path & token path")
     
-    # Run the FastMCP server
-    mcp.run()
+
+
+
+def initialize_calendar_client(force_refresh=False):
+    """Initialize the Google Calendar client with comprehensive error handling"""
+    global calendar_client, last_auth_check
+    
+    if not force_refresh and calendar_client is not None:
+        return True
+    
+    if CalendarClient is None:
+        print("❌ CalendarClient class not available due to import error")
+        return False
+    
+    try:
+        print("🔄 Attempting to initialize Google Calendar client...")
+        
+        # Check if token file exists and is recent
+        token_file = TOKEN_PATH
+        if os.path.exists(token_file):
+            token_age = time.time() - os.path.getmtime(token_file)
+            print(f"📝 Token file age: {token_age/60:.1f} minutes")
+        
+        calendar_client = CalendarClient()
+        last_auth_check = time.time()
+        print("✅ Google Calendar client initialized successfully")
+        return True
+    
+    except FileNotFoundError as e:
+        print(f"❌ Credentials file not found: {e}")
+        print("💡 Make sure your .env file has the correct CREDENTIALS_PATH")
+        return False
+    except Exception as e:
+        print(f"❌ Failed to initialize Google Calendar client: {e}")
+        print(f"   Error type: {type(e).__name__}")
+        
+#calendar mcp tools
+
+@mcp.tool()
+def get_calendar_events(num_events: int = 10) -> str:
+    """Get the next x number of events from the calendar"""
+    global calendar_client
+    
+    if not calendar_client:
+        if not initialize_calendar_client():
+            return "❌ Calendar client is not available. Try using `refresh_auth` or restarting the MCP server."
+        
+        try:
+            events = calendar_client.GetEvents(num_events)
+            return f"✅ Successfully fetched {len(events)} events:\n\n{events}"
+        except Exception as e:
+            return f"❌ Error fetching events: {str(e)}"
+
+
+
+@mcp.resource("format://dictionary-for-calendar-events")
+def formatting_info_for_calendar():   
+    return """"
+        This is the general format for 
+        how to format events:
+
+        event = {
+   'summary': 'Google I/O 2015',
+  'location': '800 Howard St., San Francisco, CA 94103',
+  'description': 'A chance to hear more about Google\'s developer products.',
+  'start': {
+    'dateTime': '2015-05-28T09:00:00-07:00',
+    'timeZone': 'America/Los_Angeles',
+  },
+  'end': {
+    'dateTime': '2015-05-28T17:00:00-07:00',
+    'timeZone': 'America/Los_Angeles',
+  },
+  'recurrence': [
+    'RRULE:FREQ=DAILY;COUNT=2'
+  ],
+  'attendees': [
+    {'email': 'lpage@example.com'},
+    {'email': 'sbrin@example.com'},
+  ],
+  'reminders': {
+    'useDefault': False,
+    'overrides': [
+      {'method': 'email', 'minutes': 24 * 60},
+      {'method': 'popup', 'minutes': 10},
+    ],
+  },
+}
+    
+At the minimum, to create an event you need 
+    the summary & the starting time. If no ending time is given, automatically assume that the end time is 1h after start time
+    
+    """
+
+
+
+
+
+
+@mcp.tool()
+def create_calendar_event(event : dict):
+
+    global calendar_client
+
+    if not calendar_client:
+        if not initialize_calendar_client():
+            return "Calendar client not intialized, error here"
+    try:
+        create_result = calendar_client.createEvent(event)
+        if create_result != 'error creating the new calendar event':
+            return create_result
+    except Exception as e:
+        print('error creating the new calendar event')
+        return 'error creating the new calendar event'
+
+
+
+
+
+
+
+    # Run the FastMCP server    
+mcp.run()
 
 if __name__ == "__main__":
     main()
