@@ -16,93 +16,142 @@ class CalendarClient:
         self.service = build('calendar', 'v3', credentials=self.creds)
     
     # return the next x # of events
-    def GetEvents(self , num : int):
+    def GetEvents(self, num: int):
+        """
+    Get the next 'num' upcoming events from the primary calendar.
+    
+    Args:
+        num (int): Number of events to retrieve
+        
+    Returns:
+        list: List of event dictionaries, or empty list if no events found
+    """
         now = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+    
         try:
             events_result = (
-        self.service.events()
-        .list(
-            calendarId="primary",
-            timeMin=now,
-            maxResults=10,
-            singleEvents=True,
-            orderBy="startTime",
+                self.service.events()
+                .list(
+                calendarId="primary",
+                timeMin=now,
+                maxResults=num,
+                singleEvents=True,
+                orderBy="startTime",
+            )
+            .execute()
         )
-        .execute()
-    )
+        
             events = events_result.get('items', [])
+        
             if not events:
                 print("No upcoming events found.")
-                return
+                return 'no upcoming events found'
         
-            for event in events:
+            # Print events for debugging/display purposes
+            print(f"Found {len(events)} upcoming event(s):")
+            for i, event in enumerate(events, 1):
                 start = event['start'].get('dateTime', event['start'].get('date'))
-                print(start, event["summary"])
+                print(f"{i}. {start} - {event['summary']}")
+        
+            # Return the events list so it can be used by other functions
+            return events
         
         except HttpError as error:
             print(f"An error occurred: {error}")
+            return 'error fetching events'
     
 
+
+
+    def createEvent(self, event: dict):
+        """
+    Create a Google Calendar event using the provided event dictionary.
     
-    def createEvent(self, summary, description, start_iso, end_iso=None, calendar_id="primary", user_tz="UTC"):
-        """
-        Create a Google Calendar event using exactly the user's IANA timezone (user_tz).
-        - `start_iso` and `end_iso` must already be full ISO‐8601 strings with offset (e.g. "2025-06-02T17:00:00+02:00").
-        - `user_tz` is something like "Europe/Paris" or "America/Los_Angeles".
-        """
-        global service, creds
+    Args:
+        event (dict): Event dictionary containing all event details including:
+            - summary (required): Event title
+            - start (required): Dict with 'dateTime' and 'timeZone'
+            - end (required): Dict with 'dateTime' and 'timeZone'
+            - description (optional): Event description
+            - location (optional): Event location
+            - attendees (optional): List of attendee dicts with 'email'
+            - recurrence (optional): List of recurrence rules
+            - reminders (optional): Dict with reminder settings
+    
+    Returns:
+        bool: True if event created successfully, False otherwise
+    """
 
         # Ensure credentials exist
-        if creds is None:
-            authenticate()
+        if self.creds is None:
+            self.creds = authenticate()
 
-        if service is None and creds is not None:
-            self.service = build("calendar", "v3", credentials=creds)
+        if self.service is None and self.creds is not None:
+            self.service = build("calendar", "v3", credentials=self.creds)
 
-        if not summary or not start_iso:
-            print("Missing required parameters for createEvent")
+    # Validate required fields
+        if not event.get('summary'):
+            print("Missing required parameter: summary")
+            return False
+    
+        if not event.get('start') or not event.get('start', {}).get('dateTime'):
+            print("Missing required parameter: start.dateTime")
+            return False
+    
+        if not event.get('end') or not event.get('end', {}).get('dateTime'):
+            print("Missing required parameter: end.dateTime")
             return False
 
         try:
-            # Now that ChatGPT has given us a full ISO‐8601 with offset in start_iso,
-        # we can parse it into a tz-aware datetime:
+            # Validate datetime formats
+            start_iso = event['start']['dateTime']
+            end_iso = event['end']['dateTime']
+        
             start_dt = datetime.datetime.fromisoformat(start_iso)
-            # If end_iso is omitted, default to 1 hour after:
-            if not end_iso or end_iso == "":
-                end_dt = start_dt + datetime.timedelta(hours=1)
-                end_iso = end_dt.isoformat()
-            else:
-                end_dt = datetime.datetime.fromisoformat(end_iso)
+            end_dt = datetime.datetime.fromisoformat(end_iso)
 
             if end_dt <= start_dt:
-              print("Error: End time must be after start time")
-              return False
+                print("Error: End time must be after start time")
+                return False
 
         except ValueError as e:
             print(f"Invalid datetime format: {e}")
             return False
 
-    # Use the USER’S timezone (user_tz), not server’s. Do NOT compute server‐side tz anymore.
+
+    # Build the event body with all provided fields
         event_body = {
-        "summary": summary,
-        "description": description or "",
+        "summary": event['summary'],
         "start": {
-            "dateTime": start_iso,   # e.g. "2025-06-02T17:00:00+02:00"
-            "timeZone": user_tz,     # e.g. "Europe/Paris"
+            "dateTime": event['start']['dateTime'],
+            "timeZone": event['start'].get('timeZone', 'UTC'),
         },
         "end": {
-            "dateTime": end_iso,
-            "timeZone": user_tz,
+            "dateTime": event['end']['dateTime'],
+            "timeZone": event['end'].get('timeZone', 'UTC'),
         },
     }
+    
+    # Add optional fields if provided
+        if event.get('description'):
+            event_body['description'] = event['description']
+    
+        if event.get('location'):
+            event_body['location'] = event['location']
+
+        if event.get('attendees'):
+            event_body['attendees'] = event['attendees']
+    
+        if event.get('recurrence'):
+            event_body['recurrence'] = event['recurrence']
+    
+        if event.get('reminders'):
+            event_body['reminders'] = event['reminders']
+
         try:
-            event = self.service.events().insert(calendarId = 'primary', body=event_body)
-            print (f'Event created: %s' % (event.get('htmlLink')))
-            return True
+            result = self.service.events().insert(calendarId='primary', body=event_body).execute()
+            print(f'Event created: {result.get("htmlLink")}')
+            return result.get("htmlLink")
         except Exception as e:
-            print(f'error creating event {e}')
-            return False
-
-        
-
-
+            print(f'Error creating event: {e}')
+            return 'error creating the new calendar event'
